@@ -5,10 +5,11 @@
 #include <chrono>
 #include <thread>
 #include <string>
+#include <memory>
 #include <stdio.h>
 
-std::atomic<bool> is_running;
 
+std::atomic<bool> is_running;
 
 struct HeavyObject : public lgc::GCObject
 {
@@ -28,10 +29,19 @@ struct HeavyObject : public lgc::GCObject
     }
 };
 
+#ifdef USE_STD_SHARED_PTR
+std::shared_ptr<HeavyObject> global_obj_ptr;
+thread_local std::shared_ptr<HeavyObject> local_obj_ptr;
+#else
 lgc::GCObjectPtr<HeavyObject> global_obj_ptr;
 thread_local lgc::GCObjectPtr<HeavyObject> local_obj_ptr;
+#endif
 
+#ifdef USE_STD_SHARED_PTR
+std::shared_ptr<HeavyObject> getLocalHeavyObject()
+#else
 lgc::GCObjectPtr<HeavyObject> getLocalHeavyObject()
+#endif
 {
     return local_obj_ptr;
 }
@@ -52,7 +62,7 @@ void backgroundGCThread()
 void workThread()
 {
     lgc::GCMgr::getInstance()->setupThreadIndexForThisThread();
-    
+
     while (is_running.load() == true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -60,7 +70,7 @@ void workThread()
 
         for (int i = 0; i != 999; i++)
         {
-            lgc::GCObjectPtr<HeavyObject> obj_ptr = getLocalHeavyObject();
+            auto obj_ptr = getLocalHeavyObject();
             if (obj_ptr != nullptr && obj_ptr->i != 0)
             {
                 // do something
@@ -85,11 +95,15 @@ int main()
     // create HeavyObject
     for (int i = 0; i < 10; i++)
     {
-       lgc::GCObjectPtr<HeavyObject> obj_ptr = lgc::GCMgr::getInstance()->newGCObject<HeavyObject>();
-       obj_ptr->version = i;
-       global_obj_ptr = obj_ptr; // setup global obj
+#ifdef USE_STD_SHARED_PTR
+        auto obj_ptr = std::make_shared<HeavyObject>();
+#else
+        auto obj_ptr = lgc::GCMgr::getInstance()->newGCObject<HeavyObject>();
+#endif
+        obj_ptr->version = i;
+        global_obj_ptr = obj_ptr; // setup global obj
 
-       std::this_thread::sleep_for(std::chrono::milliseconds(1 * 1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1 * 1000));
     }
     global_obj_ptr = nullptr;
 
