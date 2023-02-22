@@ -155,7 +155,7 @@ public:
     GCObjectPtr<T> newGCObject()
     {
         // TODO: use aligned new
-        T* gcobject = (T*)new T();
+        T* gcobject = (T*)new (std::align_val_t(64)) T();
         {
             std::lock_guard<std::mutex> guard(gcobject_set_mutex_);
             gcobject_set_.insert(gcobject);

@@ -17,6 +17,7 @@ struct HeavyObject : public lgc::GCObject
     int i = 0;
     double d = 0.0;
     std::string s;
+    char buffer[4096];
 
     HeavyObject()
     {
